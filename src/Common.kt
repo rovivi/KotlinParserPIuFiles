@@ -1,50 +1,26 @@
-class Common{
-    companion object{
+class Common {
+    companion object {
         /**NOTE FIELDS*/
-        val NOTE_EMPTY=0
-        val NOTE_TAP=1
-        val NOTE_LONG_START=2
-        val NOTE_LONG_END=3
-        val NOTE_FAKE=3
-        val NOTE_MINE=4
-        val NOTE_MINE_DEATH=5
-        val NOTE_POSION=6
-        val NOTE_LONG_PRESED=9
-        val NOTE_PRESED=127
-
-
+        const val NOTE_EMPTY: Short = 0
+        const val NOTE_TAP: Short = 1
+        const val NOTE_LONG_START: Short = 2
+        const val NOTE_LONG_END: Short = 3
+        const val NOTE_FAKE: Short = 4
+        const val NOTE_MINE: Short = 5
+        const val NOTE_MINE_DEATH: Short = 6
+        const val NOTE_POSION: Short = 7
+        const val NOTE_LONG_BODY: Short = 8
+        const val NOTE_LONG_PRESED: Short = 9
+        const val NOTE_PRESED: Short = 127
 
 
         /**PERFORMANCE*/
 
-        val PLAYER_0 =0
-        val PLAYER_1 =1
-        val PLAYER_2 =2
-        val PLAYER_3 =3
+        const val PLAYER_0: Byte = 1
+        const val PLAYER_1: Byte = 2
+        const val PLAYER_2: Byte = 3
+        const val PLAYER_3: Byte = 4
 
 
     }
 }
-/***  0 null char
-1 normal step
-2 start long
-3 end long
-4 body long
-5 fake
-6 hidden
-7 mine
-8 poisson
-9 pressed long
-10
-11
-12
-13
-14
-15
-16
-17
-18
-
-127 presed
-
- ****/
