@@ -86,6 +86,7 @@ class FileSSC(override var pathFile: String) : StepFile {
     }
 
     private fun stringToGameRow(data: String): GameRow {
+        var gameRow = GameRow()
         var row = data.replace("{x}", "f")
         val re = Regex("\\{([^}]+)}")
         val matcher = Pattern.compile(re.toString()).matcher(row)
@@ -106,8 +107,8 @@ class FileSSC(override var pathFile: String) : StepFile {
                 arrayNotes.add(charToNote(l))
             }
         }
-        print ("-----$row ------")
-        return GameRow()
+        gameRow.notes = arrayNotes
+        return gameRow
     }
 
     private fun checkEmptyRow(row: String): Boolean {
