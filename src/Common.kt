@@ -21,6 +21,10 @@ class Common {
         const val PLAYER_2: Byte = 3
         const val PLAYER_3: Byte = 4
 
-
+        fun almostEqual(a:Double,b:Double):Boolean{
+            val tolerance = 0.00000001
+            return Math.abs(a-b)<tolerance
+        }
     }
+
 }

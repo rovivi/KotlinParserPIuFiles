@@ -1,12 +1,17 @@
 package game
 
 class StepObject {
-
+    /**Game Data*/
     lateinit var steps : ArrayList<GameRow>
     var name :String = ""
-    lateinit var BPMS : List<List<Double>>
+    var offset :Double = 0.0
 
-    constructor()
+
+     /**Media Data*/
+
+     var songFileName :String = ""
+     var bgImageFileName :String = ""
+
 
 }
 

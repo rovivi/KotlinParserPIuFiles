@@ -7,12 +7,10 @@ import game.StepObject
 import java.lang.Exception
 import java.util.regex.Pattern
 
-class FileSSC(override var pathFile: String) : StepFile {
-    var indexStep: Int = 3
+class FileSSC(override var  pathFile: String, override var indexStep:Int ) : StepFile {
 
     override fun writeFile(path: String) {
     }
-
     override fun parseData(): StepObject {
         var stringData = StepFile.UtilsSteps.pathToString(pathFile)
         val songMetaData: HashMap<String, String> = HashMap()
@@ -26,6 +24,7 @@ class FileSSC(override var pathFile: String) : StepFile {
         val matcher = Pattern.compile("#([^;]+);").matcher(stringData)
         var indexLevel = -1//
 
+        //Parse for the win
         while (matcher.find()) {
             val currentTag = matcher.group().split(":")
             val key = currentTag[0].replace("#", "")
@@ -39,15 +38,50 @@ class FileSSC(override var pathFile: String) : StepFile {
                     "STEPSTYPE" -> print("owo")
                     "BPMS", "STOPS", "DELAYS", "WARPS", "TIMESIGNATURES", "TICKCOUNTS", "COMBOS", "SPEEDS", "SCROLLS" ->
                         if (value != "") modifiers[key] = fillModifiers(value)
-                    else -> {
-                        //if (value != "") modifiers[key] = fillModifiers(value)
+                }
+                -1 ->{
+                    when (key){//Si se tienen effectos globales
+                        "BPMS", "STOPS", "DELAYS", "WARPS", "TIMESIGNATURES", "TICKCOUNTS", "COMBOS", "SPEEDS", "SCROLLS" ->
+                            if (value != "") modifiers[key] = fillModifiers(value)
+                        else ->songMetaData[key] = value
                     }
                 }
-                -1 -> songMetaData[key] = value
             }
         }
+
+
+        /**End Parsing */
+
+        /**Start Apply effects*/
+        modifiers.forEach{modifier->
+            when (modifier.key){
+                "BPMS","WARPS","TICKCOUNTS"->{
+                    modifier.value.forEach{values-> //lista de efectos
+                            val beat=  values[0]
+                            val element = stepObject.steps.filter { row-> Common.almostEqual(row.currentBeat,beat) }.firstOrNull()
+                            val index = (stepObject.steps.indexOf(element))
+                            if (index!=-1){
+                                if (stepObject.steps[index].modifiers==null) stepObject.steps[index].modifiers=HashMap()
+                                stepObject.steps[index].modifiers?.put(modifier.key, values)
+                            }
+                            else {
+                                var newRow= GameRow()
+                                newRow.modifiers=HashMap()
+                                newRow.modifiers?.put(modifier.key,values)
+                                stepObject.steps.add(newRow)
+                            }
+                    }
+                }
+            }
+        }
+
+        /**End Apply effects*/
+
+        stepObject.steps.sortedBy {it.currentBeat}.forEach{x-> println(x)}
         return stepObject
     }
+
+
 
     private fun fillModifiers(data: String): ArrayList<ArrayList<Double>> {
         val list: ArrayList<ArrayList<Double>> = ArrayList()
@@ -71,7 +105,7 @@ class FileSSC(override var pathFile: String) : StepFile {
         blocks.forEach { block ->
             val rowsStep = block.split("\r").filter { x -> x != "" }
             val blockSize = rowsStep.size
-            println(blockSize)
+            //println(blockSize)
             rowsStep.forEach { row ->
                 if (!checkEmptyRow(row)) {
                     val gameRow = stringToGameRow(row)
@@ -79,6 +113,7 @@ class FileSSC(override var pathFile: String) : StepFile {
                     listGameRow.add(gameRow)
                     //println("$row beat: $currentBeat")
                 }
+                println(currentBeat)
                 currentBeat += 4.0 / blockSize
             }
         }
@@ -173,7 +208,7 @@ class FileSSC(override var pathFile: String) : StepFile {
                 when(noteString[1]) {
                     'v','V'-> note.vanish=true
                     'h','H'-> note.hidden=true
-                    's','S'-> note.sundded=true
+                    's','S'-> note.sudden=true
                 }
                 if (noteString[2]=='1') note.fake=true
                 note

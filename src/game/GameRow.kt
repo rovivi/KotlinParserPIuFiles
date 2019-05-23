@@ -1,19 +1,20 @@
 package game
 
-import java.util.*
 import kotlin.collections.ArrayList
 
 class GameRow {
-    var BPM : Double? =null
-    var scroll : Double? =null
     var notes :ArrayList<Note>? = null
-    var speedMod :Array<Int>?= null
     var currentBeat :Double = 0.0
-
-    constructor()
-
-    constructor(notes :ArrayList<Note>)
-
+    var modifiers : HashMap<String, ArrayList<Double>>?= null
+    override fun toString(): String {
+        var noteStr =""
+        var modStr =""
+        notes?.forEach { x-> noteStr+=x.type }
+        modifiers?.forEach{mod->
+            modStr="type: "+mod.key+" val: "+mod.value.toString()
+        }
+        return "GameRow(---notes=$noteStr,---- currentBeat=$currentBeat, modifiers=$modStr)"
+    }
 
 
 }
