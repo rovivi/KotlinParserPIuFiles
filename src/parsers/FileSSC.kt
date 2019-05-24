@@ -7,15 +7,17 @@ import game.StepObject
 import java.lang.Exception
 import java.util.regex.Pattern
 
-class FileSSC(override var  pathFile: String, override var indexStep:Int ) : StepFile {
+class FileSSC(override var pathFile: String, override var indexStep: Int) : StepFile {
 
     override fun writeFile(path: String) {
     }
+
     override fun parseData(): StepObject {
         var stringData = StepFile.UtilsSteps.pathToString(pathFile)
         val songMetaData: HashMap<String, String> = HashMap()
         val modifiers: HashMap<String, ArrayList<ArrayList<Double>>> = HashMap()
         val stepObject = StepObject()
+        var steps :ArrayList<GameRow> = arrayListOf()
 
         //Se limpian los comentarios
         stringData = stringData.replace(Regex("(\\s+//-([^;]+)\\s)|(//[\\s+]measure\\s[0-9]+\\s)"), "")
@@ -34,54 +36,93 @@ class FileSSC(override var  pathFile: String, override var indexStep:Int ) : Ste
             }//next step
             when (indexLevel) {
                 indexStep -> when (key) {
-                    "NOTES" -> stepObject.steps= processNotes(value)
+                    "NOTES" -> steps = processNotes(value)
                     "STEPSTYPE" -> print("owo")
                     "BPMS", "STOPS", "DELAYS", "WARPS", "TIMESIGNATURES", "TICKCOUNTS", "COMBOS", "SPEEDS", "SCROLLS" ->
                         if (value != "") modifiers[key] = fillModifiers(value)
                 }
-                -1 ->{
-                    when (key){//Si se tienen effectos globales
+                -1 -> {
+                    when (key) {//Si se tienen effectos globales
                         "BPMS", "STOPS", "DELAYS", "WARPS", "TIMESIGNATURES", "TICKCOUNTS", "COMBOS", "SPEEDS", "SCROLLS" ->
                             if (value != "") modifiers[key] = fillModifiers(value)
-                        else ->songMetaData[key] = value
+                        else -> songMetaData[key] = value
                     }
                 }
             }
         }
-
 
         /**End Parsing */
 
         /**Start Apply effects*/
-        modifiers.forEach{modifier->
-            when (modifier.key){
-                "BPMS","WARPS","TICKCOUNTS"->{
-                    modifier.value.forEach{values-> //lista de efectos
-                            val beat=  values[0]
-                            val element = stepObject.steps.filter { row-> Common.almostEqual(row.currentBeat,beat) }.firstOrNull()
-                            val index = (stepObject.steps.indexOf(element))
-                            if (index!=-1){
-                                if (stepObject.steps[index].modifiers==null) stepObject.steps[index].modifiers=HashMap()
-                                stepObject.steps[index].modifiers?.put(modifier.key, values)
-                            }
-                            else {
-                                var newRow= GameRow()
-                                newRow.modifiers=HashMap()
-                                newRow.modifiers?.put(modifier.key,values)
-                                stepObject.steps.add(newRow)
-                            }
+        modifiers.forEach { modifier ->
+            when (modifier.key) {
+                "BPMS","WARPS","TICKCOUNTS","SPEEDS","SCROLLS","STOPS","DELAYS" -> {
+                    modifier.value.forEach { values ->
+                        //lista de efectos
+                        val beat = values[0]
+                        val element =
+                            steps.filter { row -> Common.almostEqual(row.currentBeat, beat) }.firstOrNull()
+                        val index = (steps.indexOf(element))
+                        if (index != -1) {
+                            if (steps[index].modifiers == null) steps[index].modifiers = HashMap()
+                            steps[index].modifiers?.put(modifier.key, values)
+                        } else {
+                            var newRow = GameRow()
+                            newRow.currentBeat =values[0]
+                            newRow.modifiers = HashMap()
+                            newRow.modifiers?.put(modifier.key, values)
+                            steps.add(newRow)
+                        }
                     }
                 }
             }
         }
 
-        /**End Apply effects*/
+        //stepObject.steps.sortedWith(compareBy {it.currentBeat}).forEach { x -> println(x) }
 
-        stepObject.steps.sortedBy {it.currentBeat}.forEach{x-> println(x)}
+        var stepsAux = steps.sortedBy { it.currentBeat }.filter { x->x.modifiers!= null  }
+        var currentBPM = 0.0
+        var currentScroll = 0.0
+        stepsAux.forEach{x->
+            if (x.modifiers!=null){
+                x.modifiers!!.forEach { mod->
+                    when (mod.key){
+                        "BPMS"->{
+                            currentBPM= mod.value[1]
+                        }
+                        "SCROLLS"->{
+                            currentScroll= mod.value[1]
+                        }
+                        "STOPS","DELAY"->{//Stop Into Beat Conversion
+                            var rowStop = GameRow()
+                            rowStop.modifiers= hashMapOf()
+                            rowStop.modifiers!!.put("SCROLLS", arrayListOf(0.0,0.0))
+                            rowStop.currentBeat=x.currentBeat
+
+                            val beatsAdditionals= Common.secondToBeat(mod.value[1],currentBPM)
+                            x.modifiers!!.put("SCROLLS", arrayListOf(0.0,currentScroll))
+                            x.currentBeat+=beatsAdditionals
+
+                            for (row in stepsAux){
+                                if (row.currentBeat>x.currentBeat) {
+                                    row.currentBeat+=beatsAdditionals
+                                }
+                            }
+
+
+                        }
+                    }
+                }
+            }
+        }
+
+        stepsAux.forEach{x-> println(x.toString())}
+        //stepObject.steps
+
+        /**End Apply effects*/
+        //stepObject.steps.forEach { x -> println(x) }
         return stepObject
     }
-
-
 
     private fun fillModifiers(data: String): ArrayList<ArrayList<Double>> {
         val list: ArrayList<ArrayList<Double>> = ArrayList()
@@ -109,11 +150,9 @@ class FileSSC(override var  pathFile: String, override var indexStep:Int ) : Ste
             rowsStep.forEach { row ->
                 if (!checkEmptyRow(row)) {
                     val gameRow = stringToGameRow(row)
-                    gameRow.currentBeat=currentBeat
+                    gameRow.currentBeat = currentBeat
                     listGameRow.add(gameRow)
-                    //println("$row beat: $currentBeat")
                 }
-                println(currentBeat)
                 currentBeat += 4.0 / blockSize
             }
         }
@@ -125,20 +164,19 @@ class FileSSC(override var  pathFile: String, override var indexStep:Int ) : Ste
         var row = data.replace("{x}", "f")
         val re = Regex("\\{([^}]+)}")
         val matcher = Pattern.compile(re.toString()).matcher(row)
-        val arrayNotes=ArrayList<Note>()
+        val arrayNotes = ArrayList<Note>()
         val arrayEspecialNote = ArrayList<String>()
 
         while (matcher.find()) {
-             arrayEspecialNote.add( matcher.group())
+            arrayEspecialNote.add(matcher.group())
         }
         row = row.replace(re, "E")
-        var indexEspecialNote= 0
-        row.forEach { l->
-            if (l =='E'){
+        var indexEspecialNote = 0
+        row.forEach { l ->
+            if (l == 'E') {
                 arrayNotes.add(specialToNote(arrayEspecialNote[indexEspecialNote]))
                 indexEspecialNote++
-            }
-            else {
+            } else {
                 arrayNotes.add(charToNote(l))
             }
         }
@@ -151,72 +189,71 @@ class FileSSC(override var  pathFile: String, override var indexStep:Int ) : Ste
     }
 
 
-        private fun charToNote(caracter: Char): Note {
-            val note = Note()
-            var charCode: Short = Common.NOTE_EMPTY
+    private fun charToNote(caracter: Char): Note {
+        val note = Note()
+        var charCode: Short = Common.NOTE_EMPTY
 
-            when (caracter) {
-                '1' -> charCode = Common.NOTE_TAP
-                '2','6' -> charCode = Common.NOTE_LONG_START
-                '3' -> charCode = Common.NOTE_LONG_END
-                //'L' -> charCode = 4
-                'M' -> charCode = Common.NOTE_MINE
-                'F', 'f' -> charCode = Common.NOTE_FAKE
-                'V' -> {
-                    charCode = Common.NOTE_TAP
-                    note.vanish=true
-                }
-                'h' -> {
-                    charCode = Common.NOTE_TAP
-                    note.hidden=true
-                }
-                'x' ->{
-                    charCode= Common.NOTE_LONG_START
-                    note.player =Common.PLAYER_1
-                }
-                'X' ->{
-                    charCode= Common.NOTE_TAP
-                    note.player =Common.PLAYER_1
-                }
-                'y' ->{
-                    charCode= Common.NOTE_LONG_START
-                    note.player =Common.PLAYER_2
-                }
-                'Y' ->{
-                    charCode= Common.NOTE_TAP
-                    note.player =Common.PLAYER_2
-                }'z' ->{
-                charCode= Common.NOTE_LONG_START
-                note.player =Common.PLAYER_3
-                }
-                'Z' ->{
-                    charCode= Common.NOTE_TAP
-                    note.player =Common.PLAYER_3
-                }
-                else -> {
-                    //Default Stuff
-                }
+        when (caracter) {
+            '1' -> charCode = Common.NOTE_TAP
+            '2', '6' -> charCode = Common.NOTE_LONG_START
+            '3' -> charCode = Common.NOTE_LONG_END
+            //'L' -> charCode = 4
+            'M' -> charCode = Common.NOTE_MINE
+            'F', 'f' -> charCode = Common.NOTE_FAKE
+            'V' -> {
+                charCode = Common.NOTE_TAP
+                note.vanish = true
             }
-            note.type=charCode
-            return note
-        }
-
-        private fun specialToNote (re:String ):Note{
-            val noteString = re.replace("{","").replace("}","").replace("|","")
-            return try {
-                val note= charToNote(noteString[0])
-                when(noteString[1]) {
-                    'v','V'-> note.vanish=true
-                    'h','H'-> note.hidden=true
-                    's','S'-> note.sudden=true
-                }
-                if (noteString[2]=='1') note.fake=true
-                note
-            } catch (ex:Exception){
-                ex.printStackTrace()
-                Note()
+            'h' -> {
+                charCode = Common.NOTE_TAP
+                note.hidden = true
+            }
+            'x' -> {
+                charCode = Common.NOTE_LONG_START
+                note.player = Common.PLAYER_1
+            }
+            'X' -> {
+                charCode = Common.NOTE_TAP
+                note.player = Common.PLAYER_1
+            }
+            'y' -> {
+                charCode = Common.NOTE_LONG_START
+                note.player = Common.PLAYER_2
+            }
+            'Y' -> {
+                charCode = Common.NOTE_TAP
+                note.player = Common.PLAYER_2
+            }
+            'z' -> {
+                charCode = Common.NOTE_LONG_START
+                note.player = Common.PLAYER_3
+            }
+            'Z' -> {
+                charCode = Common.NOTE_TAP
+                note.player = Common.PLAYER_3
+            }
+            else -> {
+                //Default Stuff
             }
         }
-
-
+        note.type = charCode
+        return note
     }
+
+    private fun specialToNote(re: String): Note {
+        val noteString = re.replace("{", "").replace("}", "").replace("|", "")
+        return try {
+            val note = charToNote(noteString[0])
+            when (noteString[1]) {
+                'v', 'V' -> note.vanish = true
+                'h', 'H' -> note.hidden = true
+                's', 'S' -> note.sudden = true
+            }
+            if (noteString[2] == '1') note.fake = true
+            note
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+            Note()
+        }
+    }
+}
