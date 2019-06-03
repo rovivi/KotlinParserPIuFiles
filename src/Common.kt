@@ -1,4 +1,10 @@
+import game.GameRow
+import game.Note
+import java.util.*
+import kotlin.collections.ArrayList
+
 class Common {
+
     companion object {
         /**NOTE FIELDS*/
         const val NOTE_EMPTY: Short = 0
@@ -11,11 +17,10 @@ class Common {
         const val NOTE_POSION: Short = 7
         const val NOTE_LONG_BODY: Short = 8
         const val NOTE_LONG_PRESED: Short = 9
+        const val NOTE_LONG_TOUCHABLE: Short = 10
         const val NOTE_PRESED: Short = 127
 
-
         /**PERFORMANCE*/
-
         const val PLAYER_0: Byte = 1
         const val PLAYER_1: Byte = 2
         const val PLAYER_2: Byte = 3
@@ -31,12 +36,68 @@ class Common {
         fun secondToBeat(value:Double,BPM:Double) :Double {
             return  value*BPM
         }
+        fun orderByBeat (array:List<GameRow>){
+            Collections.sort(array){ x,y->
+                if( x.currentBeat>y.currentBeat ) 1 else -1
+            }
+        }
+        fun applyLongNotes (steps:ArrayList<GameRow>){
+            var currentTickCount = 0.0
+            var i = 0
+            while (i <steps.size){
+                val row =steps[i]
+                if (row.modifiers?.get("TICKCOUNTS") !=null){
+                    currentTickCount = row.modifiers!!["TICKCOUNTS"]!![1]
+                }
+                if (row.notes!= null){
+                    for (j in 0 until row.notes!!.size){
+                        if (row.notes!![j].type ==NOTE_LONG_START){
+                            var beatLong = row.currentBeat
 
+                            val newNote = Note()//Se crea una nueva nota que tiene los mismos parametros que la de entrada
+                            newNote.fake=row.notes!![j].fake;
+                            newNote.vanish=row.notes!![j].vanish;
+                            newNote.hidden=row.notes!![j].hidden;
+                            newNote.skin= row.notes!![j].skin;
+                            newNote.player =row.notes!![j].player;
+                            newNote.sudden =row.notes!![j].sudden;
+                            newNote.type= NOTE_LONG_BODY
+                            while (currentTickCount!=0.0){//prevent infinite loop
+                                beatLong+= 1.0/currentTickCount
+                                val newRowAux = steps.firstOrNull{ findRow-> almostEqual(beatLong,findRow.currentBeat)}
+                                if ( newRowAux==null){
+                                    val newRow= GameRow()
+                                    newRow.currentBeat=beatLong
+                                    newRow.notes= arrayListOf(Note(),Note(),Note(),Note(),Note(),Note(),Note(),Note(),Note(),Note())
+                                    newRow.notes!![j]= newNote
+                                    steps.add(newRow)
+                                    //println("beat: $beatLong" )
+                                }
+                                else {
+                                    if (newRowAux.modifiers?.get("TICKCOUNTS") !=null){
+                                        currentTickCount = newRowAux.modifiers!!["TICKCOUNTS"]!![1]
+                                    }
+                                    if ( newRowAux.notes!=null && newRowAux.notes?.get(j)!!.type==NOTE_LONG_END){
+                                        break
+                                    }
+                                    if (newRowAux.notes ==null ){
+                                        newRowAux.notes= arrayListOf(Note(),Note(),Note(),Note(),Note(),Note(),Note(),Note(),Note(),Note())
+                                    }
+                                    newRowAux.notes!![j].type = NOTE_LONG_BODY
+                                }
+                            }
+                            orderByBeat(steps)
+                        }
+                    }
+                }
+                i++
+            }
+        }
 
     }
 
     class NX20 {
-        companion object {
+        companion object {//Constants
             const val NOTE_NULL = 0x00
             const val NOTE_EFFECT = 0x41   //  0b01000001
             const val NOTE_DIV_BRAIN = 0x42   //  0b01000010
@@ -125,8 +186,6 @@ class Common {
             const val MetaFloor2MissionSpec3 = 263347
             const val MetaFloor3MissionSpec3 = 263447
             const val MetaFloor4MissionSpec3 = 263547
-
-
         }
     }
 }

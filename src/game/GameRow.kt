@@ -15,8 +15,6 @@ class GameRow {
         }
         return "GameRow(---notes=$noteStr,---- currentBeat=$currentBeat, modifiers=$modStr)"
     }
-
-
 }
 
 

@@ -6,12 +6,13 @@ import game.Note
 import game.StepObject
 import java.lang.Exception
 import java.util.regex.Pattern
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 class FileSSC(override var pathFile: String, override var indexStep: Int) : StepFile {
 
     override fun writeFile(path: String) {
     }
-
     override fun parseData(): StepObject {
         var stringData = StepFile.UtilsSteps.pathToString(pathFile)
         val songMetaData: HashMap<String, String> = HashMap()
@@ -56,18 +57,18 @@ class FileSSC(override var pathFile: String, override var indexStep: Int) : Step
         /**Start Apply effects*/
         modifiers.forEach { modifier ->
             when (modifier.key) {
-                "BPMS","WARPS","TICKCOUNTS","SPEEDS","SCROLLS","STOPS","DELAYS" -> {
+                "BPMS","WARPS","TICKCOUNTS","SPEEDS","SCROLLS","STOPS","DELAYS","COMBOS" -> {
                     modifier.value.forEach { values ->
-                        //lista de efectos
+                        //effect List
                         val beat = values[0]
                         val element =
-                            steps.filter { row -> Common.almostEqual(row.currentBeat, beat) }.firstOrNull()
+                            steps.firstOrNull { row -> Common.almostEqual(row.currentBeat, beat) }
                         val index = (steps.indexOf(element))
                         if (index != -1) {
                             if (steps[index].modifiers == null) steps[index].modifiers = HashMap()
                             steps[index].modifiers?.put(modifier.key, values)
                         } else {
-                            var newRow = GameRow()
+                            val newRow = GameRow()
                             newRow.currentBeat =values[0]
                             newRow.modifiers = HashMap()
                             newRow.modifiers?.put(modifier.key, values)
@@ -78,12 +79,11 @@ class FileSSC(override var pathFile: String, override var indexStep: Int) : Step
             }
         }
 
-        //stepObject.steps.sortedWith(compareBy {it.currentBeat}).forEach { x -> println(x) }
-
-        var stepsAux = steps.sortedBy { it.currentBeat }.filter { x->x.modifiers!= null  }
+        Common.orderByBeat(steps)//se ordernan
+        Common.applyLongNotes(steps)//Se aplican los longs
         var currentBPM = 0.0
         var currentScroll = 0.0
-        stepsAux.forEach{x->
+        steps.forEach{x->
             if (x.modifiers!=null){
                 x.modifiers!!.forEach { mod->
                     when (mod.key){
@@ -94,31 +94,26 @@ class FileSSC(override var pathFile: String, override var indexStep: Int) : Step
                             currentScroll= mod.value[1]
                         }
                         "STOPS","DELAY"->{//Stop Into Beat Conversion
-                            var rowStop = GameRow()
+                            val rowStop = GameRow()
                             rowStop.modifiers= hashMapOf()
-                            rowStop.modifiers!!.put("SCROLLS", arrayListOf(0.0,0.0))
+                            rowStop.modifiers!!["SCROLLS"] = arrayListOf(0.0,0.0)
                             rowStop.currentBeat=x.currentBeat
-
-                            val beatsAdditionals= Common.secondToBeat(mod.value[1],currentBPM)
-                            x.modifiers!!.put("SCROLLS", arrayListOf(0.0,currentScroll))
-                            x.currentBeat+=beatsAdditionals
-
-                            for (row in stepsAux){
+                            val additionalBeats= Common.secondToBeat(mod.value[1],currentBPM)
+                            x.modifiers!!["SCROLLS"] = arrayListOf(0.0,currentScroll)
+                            x.currentBeat+=additionalBeats
+                            for (row in steps){
                                 if (row.currentBeat>x.currentBeat) {
-                                    row.currentBeat+=beatsAdditionals
+                                    row.currentBeat+=additionalBeats
                                 }
                             }
-
-
                         }
                     }
                 }
             }
         }
-
-        stepsAux.forEach{x-> println(x.toString())}
+        Common.orderByBeat(steps)
+        steps.filter { x->x.notes!=null }.forEach{x-> println(x.toString())}
         //stepObject.steps
-
         /**End Apply effects*/
         //stepObject.steps.forEach { x -> println(x) }
         return stepObject
@@ -160,13 +155,12 @@ class FileSSC(override var pathFile: String, override var indexStep: Int) : Step
     }
 
     private fun stringToGameRow(data: String): GameRow {
-        var gameRow = GameRow()
+        val gameRow = GameRow()
         var row = data.replace("{x}", "f")
         val re = Regex("\\{([^}]+)}")
         val matcher = Pattern.compile(re.toString()).matcher(row)
         val arrayNotes = ArrayList<Note>()
         val arrayEspecialNote = ArrayList<String>()
-
         while (matcher.find()) {
             arrayEspecialNote.add(matcher.group())
         }
@@ -188,7 +182,6 @@ class FileSSC(override var pathFile: String, override var indexStep: Int) : Step
         return Regex("(0+)").matches(row)
     }
 
-
     private fun charToNote(caracter: Char): Note {
         val note = Note()
         var charCode: Short = Common.NOTE_EMPTY
@@ -197,7 +190,6 @@ class FileSSC(override var pathFile: String, override var indexStep: Int) : Step
             '1' -> charCode = Common.NOTE_TAP
             '2', '6' -> charCode = Common.NOTE_LONG_START
             '3' -> charCode = Common.NOTE_LONG_END
-            //'L' -> charCode = 4
             'M' -> charCode = Common.NOTE_MINE
             'F', 'f' -> charCode = Common.NOTE_FAKE
             'V' -> {
@@ -231,9 +223,6 @@ class FileSSC(override var pathFile: String, override var indexStep: Int) : Step
             'Z' -> {
                 charCode = Common.NOTE_TAP
                 note.player = Common.PLAYER_3
-            }
-            else -> {
-                //Default Stuff
             }
         }
         note.type = charCode

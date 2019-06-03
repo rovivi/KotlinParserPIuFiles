@@ -12,5 +12,5 @@ class Note {
     var vanish  :Boolean = false
     // var effects :SDEffect[] //Will be implemented in the future
 
-    
+
 }
